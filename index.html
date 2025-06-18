@@ -10,202 +10,325 @@
             background-color: #f0f0f0;
             margin: 0;
             padding: 20px;
+            overflow: hidden;
         }
-        .note {
-            background-color: #ffffcc;
-            border: 1px solid #ccc;
-            padding: 10px;
-            margin: 10px;
-            width: 200px;
-            min-height: 150px;
-            position: absolute;
-            box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.2);
-            cursor: move;
-        }
-        .note textarea {
-            width: 100%;
-            height: 100px;
-            border: none;
-            background: transparent;
-            resize: none;
-            font-family: Arial, sans-serif;
-        }
-        .note .delete {
-            position: absolute;
-            top: 5px;
-            right: 5px;
-            background: red;
-            color: white;
-            border: none;
-            cursor: pointer;
-            padding: 2px 6px;
-            border-radius: 3px;
-        }
-        #addNote {
+        
+        #add-note-btn {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
             background-color: #4CAF50;
             color: white;
-            padding: 10px 20px;
             border: none;
+            font-size: 12px;
             cursor: pointer;
-            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            z-index: 1000;
+        }
+        
+        #dark-mode-btn {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background-color: white;
+            border: 1px solid #333;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            z-index: 1000;
+        }
+        
+        body.dark-mode #dark-mode-btn {
+            background-color: black;
+            border-color: #777;
+        }
+        
+        body.dark-mode {
+            background-color: #222;
+        }
+        
+        body.dark-mode .note {
+            background-color: #444;
+            color: #eee;
+        }
+        
+        body.dark-mode .note-content {
+            background-color: transparent;
+            color: #eee;
+            scrollbar-width: thin;
+            scrollbar-color: #555 #444;
+        }
+        
+        /* Webkit browsers scrollbar styling */
+        body.dark-mode .note-content::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        body.dark-mode .note-content::-webkit-scrollbar-track {
+            background: #444;
+            border-radius: 3px;
+        }
+        
+        body.dark-mode .note-content::-webkit-scrollbar-thumb {
+            background-color: #555;
+            border-radius: 3px;
+        }
+        
+        #add-note-btn:hover {
+            background-color: #45a049;
+        }
+        
+        .note {
+            position: absolute;
+            width: 200px;
+            height: 200px;
+            background-color: #fff9c4;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
             border-radius: 5px;
+            padding: 10px;
+            resize: both;
+            overflow: hidden;
+            min-width: 150px;
+            min-height: 150px;
+        }
+        
+        .note {
+            cursor: default;
+        }
+        
+        .note::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 15px;
+            cursor: move;
+            z-index: 2;
+        }
+        
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            color: #888;
+            z-index: 3; /* Above draggable area's z-index of 2 */
+            position: relative;
+        }
+        
+        .note-content {
+            width: 100%;
+            height: calc(100% - 30px);
+            border: none;
+            resize: none;
+            background: transparent;
+            outline: none;
+            font-family: inherit;
+            font-size: 14px;
+            padding: 5px 0;
+            box-sizing: border-box;
         }
     </style>
 </head>
 <body>
-    <button id="addNote">Add Note</button>
-    <div id="notes"></div>
+    <button id="add-note-btn" title="Add new note (or press \)">+</button>
+    <button id="dark-mode-btn" title="Toggle dark mode"></button>
 
     <script>
-        // Load notes from localStorage on page load
-        window.onload = function() {
-            const notes = JSON.parse(localStorage.getItem('notes')) || [];
-            let highestZIndex = 0;
-            let lastNoteId = localStorage.getItem('lastNoteId');
-
-            notes.forEach(note => {
-                createNoteElement(note.id, note.content, note.x, note.y, note.zIndex);
-                if (note.zIndex > highestZIndex) {
-                    highestZIndex = note.zIndex;
-                }
-            });
-
-            // Focus the last opened note
-            if (lastNoteId) {
-                const lastNote = document.getElementById(lastNoteId);
-                if (lastNote) {
-                    lastNote.querySelector('textarea').focus();
-                }
-            }
-
-            // Set the next z-index for new notes
-            document.getElementById('addNote').dataset.nextZIndex = highestZIndex + 1;
-        };
-
-        // Add new note
-        document.getElementById('addNote').addEventListener('click', function() {
-            const id = Date.now().toString();
-            const zIndex = parseInt(this.dataset.nextZIndex || 1);
-            createNoteElement(id, '/', 50, 50, zIndex);
-            saveNote(id, '/', 50, 50, zIndex);
-            this.dataset.nextZIndex = zIndex + 1;
-
-            // Focus the newly created note
-            const newNote = document.getElementById(id);
-            newNote.querySelector('textarea').focus();
-            localStorage.setItem('lastNoteId', id);
+	document.addEventListener('DOMContentLoaded', () => {
+    const addNoteBtn = document.getElementById('add-note-btn');
+    const darkModeBtn = document.getElementById('dark-mode-btn');
+    
+    // Dark mode toggle
+    darkModeBtn.addEventListener('click', () => {
+        document.body.classList.toggle('dark-mode');
+        localStorage.setItem('sticky-notes-dark-mode', document.body.classList.contains('dark-mode'));
+    });
+    
+    // Load dark mode preference
+    if (localStorage.getItem('sticky-notes-dark-mode') === 'true') {
+        document.body.classList.add('dark-mode');
+    }
+    
+    // Load saved notes from localStorage
+    loadNotes();
+    
+    // Add note on button click - always at random position
+    addNoteBtn.addEventListener('click', () => {
+        createNote();
+    });
+    
+    // Add note on backslash key press
+    document.addEventListener('keydown', (e) => {
+        if (e.key === '\\') {
+            createNote(null, null);
+        }
+    });
+    
+    function createNote(x, y) {
+        const note = document.createElement('div');
+        note.className = 'note';
+        
+        // Position at mouse or random location
+        if (x && y) {
+            note.style.left = `${x}px`;
+            note.style.top = `${y}px`;
+        } else {
+            note.style.left = `${Math.random() * (window.innerWidth - 250)}px`;
+            note.style.top = `${Math.random() * (window.innerHeight - 250)}px`;
+        }
+        
+        note.innerHTML = `
+            <textarea class="note-content" placeholder="Type here..." spellcheck="false"></textarea>
+            <button class="close-btn" style="position: absolute; top: 0; right: 0;">×</button>
+        `;
+        
+        // Add to DOM
+        document.body.appendChild(note);
+        
+        // Make draggable
+        makeDraggable(note);
+        
+        // Close button functionality
+        const closeBtn = note.querySelector('.close-btn');
+        closeBtn.addEventListener('click', () => {
+            note.remove();
+            focusNextNote();
+            saveNotes();
         });
-
-        // Create note element
-        function createNoteElement(id, content, x, y, zIndex) {
-            const note = document.createElement('div');
-            note.className = 'note';
-            note.id = id;
-            note.style.left = x + 'px';
-            note.style.top = y + 'px';
-            note.style.zIndex = zIndex;
-
-            const textarea = document.createElement('textarea');
-            textarea.value = content;
-            textarea.addEventListener('input', function() {
-                saveNote(id, this.value, x, y, zIndex);
-            });
-
-            // Update lastNoteId when note is focused
-            textarea.addEventListener('focus', function() {
-                localStorage.setItem('lastNoteId', id);
-            });
-
-            const deleteBtn = document.createElement('button');
-            deleteBtn.className = 'delete';
-            deleteBtn.innerText = 'X';
-            deleteBtn.onclick = function() {
+        
+        // Escape key to delete note
+        const textarea = note.querySelector('.note-content');
+        textarea.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
                 note.remove();
-                deleteNote(id);
-                if (localStorage.getItem('lastNoteId') === id) {
-                    localStorage.removeItem('lastNoteId');
-                }
-            };
-
-            note.appendChild(textarea);
-            note.appendChild(deleteBtn);
-            document.getElementById('notes').appendChild(note);
-
-            // Make note draggable
-            let isDragging = false;
-            let currentX;
-            let currentY;
-            let xOffset = 0;
-            let yOffset = 0;
-
-            note.addEventListener('mousedown', startDragging);
-            document.addEventListener('mousemove', drag);
-            document.addEventListener('mouseup', stopDragging);
-
-            function startDragging(e) {
-                xOffset = e.clientX - currentX;
-                yOffset = e.clientY - currentY;
+                focusNextNote();
+                saveNotes();
+            }
+        });
+        
+        // Save on content change
+        textarea.addEventListener('input', saveNotes);
+        
+        // Immediately focus and select the text area
+        setTimeout(() => {
+            textarea.focus();
+            textarea.select();
+        }, 10);
+    }
+    
+    function focusNextNote() {
+        const notes = document.querySelectorAll('.note');
+        if (notes.length > 0) {
+            // Focus the first note's textarea
+            const nextTextarea = notes[0].querySelector('.note-content');
+            nextTextarea.focus();
+            nextTextarea.select();
+        }
+    }
+    
+    function makeDraggable(note) {
+        let isDragging = false;
+        let startX, startY, startLeft, startTop;
+        
+        note.addEventListener('mousedown', (e) => {
+            // Only handle clicks in top 15px
+            if (e.offsetY <= 15) {
                 isDragging = true;
-
-                // Bring note to front
-                const notes = JSON.parse(localStorage.getItem('notes')) || [];
-                const maxZIndex = Math.max(...notes.map(n => n.zIndex), 0);
-                note.style.zIndex = maxZIndex + 1;
-                updateZIndex(id, maxZIndex + 1);
-                document.getElementById('addNote').dataset.nextZIndex = maxZIndex + 2;
+                startX = e.clientX;
+                startY = e.clientY;
+                startLeft = parseInt(note.style.left) || 0;
+                startTop = parseInt(note.style.top) || 0;
+                e.preventDefault();
             }
-
-            function drag(e) {
-                if (isDragging) {
-                    e.preventDefault();
-                    currentX = e.clientX - xOffset;
-                    currentY = e.clientY - yOffset;
-                    note.style.left = currentX + 'px';
-                    note.style.top = currentY + 'px';
-                    saveNote(id, textarea.value, currentX, currentY, note.style.zIndex);
-                }
-            }
-
-            function stopDragging() {
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            note.style.left = `${startLeft + dx}px`;
+            note.style.top = `${startTop + dy}px`;
+            e.preventDefault();
+        });
+        
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
                 isDragging = false;
+                saveNotes();
             }
-
-            // Set initial position for saving
-            currentX = x;
-            currentY = y;
-        }
-
-        // Save note to localStorage
-        function saveNote(id, content, x, y, zIndex) {
-            const notes = JSON.parse(localStorage.getItem('notes')) || [];
-            const noteIndex = notes.findIndex(note => note.id === id);
-            const noteData = { id, content, x, y, zIndex };
-
-            if (noteIndex >= 0) {
-                notes[noteIndex] = noteData;
-            } else {
-                notes.push(noteData);
+        });
+    }
+    
+    function saveNotes() {
+        const notes = document.querySelectorAll('.note');
+        const notesData = [];
+        
+        notes.forEach(note => {
+            notesData.push({
+                x: note.style.left,
+                y: note.style.top,
+                width: note.style.width,
+                height: note.style.height,
+                content: note.querySelector('.note-content').value
+            });
+        });
+        
+        localStorage.setItem('sticky-notes', JSON.stringify(notesData));
+    }
+    
+    function loadNotes() {
+        const savedNotes = localStorage.getItem('sticky-notes');
+        if (savedNotes) {
+            try {
+                const notesData = JSON.parse(savedNotes);
+                notesData.forEach(noteData => {
+                    const note = document.createElement('div');
+                    note.className = 'note';
+                    note.style.left = noteData.x;
+                    note.style.top = noteData.y;
+                    note.style.width = noteData.width;
+                    note.style.height = noteData.height;
+                    note.innerHTML = `
+                        <textarea class="note-content" spellcheck="false">${noteData.content || ''}</textarea>
+                        <button class="close-btn" style="position: absolute; top: 0; right: 0;">×</button>
+                    `;
+                    
+                    document.body.appendChild(note);
+                    makeDraggable(note);
+                    
+                    const closeBtn = note.querySelector('.close-btn');
+                    closeBtn.addEventListener('click', () => {
+                        note.remove();
+                        focusNextNote();
+                        saveNotes();
+                    });
+                    
+                    const textarea = note.querySelector('.note-content');
+                    textarea.addEventListener('keydown', (e) => {
+                        if (e.key === 'Escape') {
+                            e.preventDefault();
+                            note.remove();
+                            focusNextNote();
+                            saveNotes();
+                        }
+                    });
+                    
+                    textarea.addEventListener('input', saveNotes);
+                });
+            } catch (e) {
+                console.error('Failed to load notes:', e);
             }
-
-            localStorage.setItem('notes', JSON.stringify(notes));
         }
-
-        // Delete note from localStorage
-        function deleteNote(id) {
-            let notes = JSON.parse(localStorage.getItem('notes')) || [];
-            notes = notes.filter(note => note.id !== id);
-            localStorage.setItem('notes', JSON.stringify(notes));
-        }
-
-        // Update z-index in localStorage
-        function updateZIndex(id, zIndex) {
-            const notes = JSON.parse(localStorage.getItem('notes')) || [];
-            const note = notes.find(note => note.id === id);
-            if (note) {
-                note.zIndex = zIndex;
-                localStorage.setItem('notes', JSON.stringify(notes));
-            }
-        }
+    }
+});
     </script>
 </body>
 </html>
