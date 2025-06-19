@@ -60,23 +60,6 @@
         body.dark-mode .note-content {
             background-color: transparent;
             color: #eee;
-            scrollbar-width: thin;
-            scrollbar-color: #555 #444;
-        }
-        
-        /* Webkit browsers scrollbar styling */
-        body.dark-mode .note-content::-webkit-scrollbar {
-            width: 6px;
-        }
-        
-        body.dark-mode .note-content::-webkit-scrollbar-track {
-            background: #444;
-            border-radius: 3px;
-        }
-        
-        body.dark-mode .note-content::-webkit-scrollbar-thumb {
-            background-color: #555;
-            border-radius: 3px;
         }
         
         #add-note-btn:hover {
@@ -95,6 +78,11 @@
             overflow: hidden;
             min-width: 150px;
             min-height: 150px;
+            z-index: 1;
+        }
+        
+        .note.dragging {
+            z-index: 10;
         }
         
         .note {
@@ -118,7 +106,7 @@
             font-size: 16px;
             cursor: pointer;
             color: #888;
-            z-index: 3; /* Above draggable area's z-index of 2 */
+            z-index: 3;
             position: relative;
         }
         
@@ -144,8 +132,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             const addNoteBtn = document.getElementById('add-note-btn');
             const darkModeBtn = document.getElementById('dark-mode-btn');
-            let noteId = 0;
-
+            
             // Dark mode toggle
             darkModeBtn.addEventListener('click', () => {
                 document.body.classList.toggle('dark-mode');
@@ -160,24 +147,38 @@
             // Load saved notes from localStorage
             loadNotes();
             
-            // Add note on button click - always at random position
+            // Add note on button click
             addNoteBtn.addEventListener('click', () => {
                 createNote();
             });
             
-            // Add note on backslash key press
+            // Add note on backslash key press and prevent default
             document.addEventListener('keydown', (e) => {
                 if (e.key === '\\') {
+                    e.preventDefault(); // Prevent backslash from being typed
                     createNote(null, null);
-                    e.preventDefault();
+                } else if (e.key === 'Escape') {
+                    const activeElement = document.activeElement;
+                    const currentNote = activeElement.closest('.note');
+                    if (currentNote) {
+                        const notes = document.querySelectorAll('.note');
+                        currentNote.remove();
+                        saveNotes();
+                        // Focus the last note if any exist
+                        if (notes.length > 1) { // Check if there was more than the deleted note
+                            const lastNote = document.querySelectorAll('.note')[notes.length - 2]; // Last note after removal
+                            const textarea = lastNote.querySelector('.note-content');
+                            textarea.focus();
+                            // Place cursor at the end of the text
+                            textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+                        }
+                    }
                 }
             });
             
             function createNote(x, y) {
                 const note = document.createElement('div');
                 note.className = 'note';
-                note.id = `note-${noteId}`;
-                noteId++;
                 
                 // Position at mouse or random location
                 if (x && y) {
@@ -203,62 +204,27 @@
                 const closeBtn = note.querySelector('.close-btn');
                 closeBtn.addEventListener('click', () => {
                     note.remove();
-                    focusNextNote();
                     saveNotes();
-                });
-                
-                // Escape key to delete note
-                const textarea = note.querySelector('.note-content');
-                textarea.addEventListener('keydown', (e) => {
-                    if (e.key === 'Escape') {
-                        e.preventDefault();
-                        note.remove();
-                        focusNewestNote();
-                        saveNotes();
+                    // Focus the last note if any exist
+                    const notes = document.querySelectorAll('.note');
+                    if (notes.length > 0) {
+                        const lastNote = notes[notes.length - 1];
+                        const textarea = lastNote.querySelector('.note-content');
+                        textarea.focus();
+                        textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
                     }
                 });
                 
                 // Save on content change
-                textarea.addEventListener('input', () => {
-                    localStorage.setItem(`sticky-notes-last-focused`, note.id);
-                    saveNotes();
-                });
-                
-                // Focus event
-                textarea.addEventListener('focus', () => {
-                    localStorage.setItem(`sticky-notes-last-focused`, note.id);
-                });
+                const textarea = note.querySelector('.note-content');
+                textarea.addEventListener('input', saveNotes);
                 
                 // Immediately focus and select the text area
                 setTimeout(() => {
+                    const textarea = note.querySelector('.note-content');
                     textarea.focus();
+                    textarea.select();
                 }, 10);
-            }
-            
-            function focusNextNote() {
-                const notes = document.querySelectorAll('.note');
-                if (notes.length > 0) {
-                    // Focus the first note's textarea
-                    const nextTextarea = notes[0].querySelector('.note-content');
-                    nextTextarea.focus();
-                }
-            }
-            
-            function focusNewestNote() {
-                const notes = document.querySelectorAll('.note');
-                if (notes.length > 0) {
-                    // Sort notes by id in descending order
-                    const sortedNotes = Array.prototype.slice.call(notes).sort((a, b) => {
-                        const aId = parseInt(a.id.split('-')[1]);
-                        const bId = parseInt(b.id.split('-')[1]);
-                        return bId - aId;
-                    });
-                    // Focus the first note's textarea
-                    const nextTextarea = sortedNotes[0].querySelector('.note-content');
-                    nextTextarea.focus();
-                    // Move cursor to end of text area
-                    nextTextarea.selectionStart = nextTextarea.selectionEnd = nextTextarea.value.length;
-                }
             }
             
             function makeDraggable(note) {
@@ -266,13 +232,13 @@
                 let startX, startY, startLeft, startTop;
                 
                 note.addEventListener('mousedown', (e) => {
-                    // Only handle clicks in top 15px
                     if (e.offsetY <= 15) {
                         isDragging = true;
                         startX = e.clientX;
                         startY = e.clientY;
                         startLeft = parseInt(note.style.left) || 0;
                         startTop = parseInt(note.style.top) || 0;
+                        note.classList.add('dragging');
                         e.preventDefault();
                     }
                 });
@@ -289,6 +255,7 @@
                 document.addEventListener('mouseup', () => {
                     if (isDragging) {
                         isDragging = false;
+                        note.classList.remove('dragging');
                         saveNotes();
                     }
                 });
@@ -300,7 +267,6 @@
                 
                 notes.forEach(note => {
                     notesData.push({
-                        id: note.id,
                         x: note.style.left,
                         y: note.style.top,
                         width: note.style.width,
@@ -320,7 +286,6 @@
                         notesData.forEach(noteData => {
                             const note = document.createElement('div');
                             note.className = 'note';
-                            note.id = noteData.id;
                             note.style.left = noteData.x;
                             note.style.top = noteData.y;
                             note.style.width = noteData.width;
@@ -336,39 +301,19 @@
                             const closeBtn = note.querySelector('.close-btn');
                             closeBtn.addEventListener('click', () => {
                                 note.remove();
-                                focusNextNote();
                                 saveNotes();
+                                // Focus the last note if any exist
+                                const notes = document.querySelectorAll('.note');
+                                if (notes.length > 0) {
+                                    const lastNote = notes[notes.length - 1];
+                                    const textarea = lastNote.querySelector('.note-content');
+                                    textarea.focus();
+                                    textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+                                }
                             });
                             
-                            const textarea = note.querySelector('.note-content');
-                            textarea.addEventListener('keydown', (e) => {
-                                if (e.key === 'Escape') {
-                                    e.preventDefault();
-                                    note.remove();
-                                    focusNewestNote();
-                                    saveNotes();
-                                }
-                            });
-                            textarea.addEventListener('input', () => {
-                                localStorage.setItem(`sticky-notes-last-focused`, note.id);
-                                saveNotes();
-                            });
-                            textarea.addEventListener('focus', () => {
-                                localStorage.setItem(`sticky-notes-last-focused`, note.id);
-                            });
-                            noteId++;
+                            note.querySelector('.note-content').addEventListener('input', saveNotes);
                         });
-                        const lastFocusedNoteId = localStorage.getItem(`sticky-notes-last-focused`);
-                        if (lastFocusedNoteId) {
-                            setTimeout(() => {
-                                const lastFocusedNote = document.getElementById(lastFocusedNoteId);
-                                if (lastFocusedNote) {
-                                    const lastFocusedTextarea = lastFocusedNote.querySelector('.note-content');
-                                    lastFocusedTextarea.focus();
-                                    lastFocusedTextarea.selectionStart = lastFocusedTextarea.selectionEnd = lastFocusedTextarea.value.length;
-                                }
-                            }, 10);
-                        }
                     } catch (e) {
                         console.error('Failed to load notes:', e);
                     }
